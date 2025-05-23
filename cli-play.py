@@ -19,11 +19,11 @@ class cli_play:
         with self.term.fullscreen(), self.term.cbreak(), self.term.hidden_cursor():
             for track in file_info.tracks:
                 if track.track_type == "Video":
-                    self.play_video(file_path)
+                    self.__play_video(file_path)
                 elif track.track_type == "Image":
-                    self.show_picture(file_path)
+                    self.__show_picture(file_path)
 
-    def play_video(self, file_path):
+    def __play_video(self, file_path):
         cap = cv2.VideoCapture(file_path)
         player = MediaPlayer(file_path)
 
@@ -59,7 +59,7 @@ class cli_play:
 
         cap.release()
 
-    def show_picture(self, file_path):
+    def __show_picture(self, file_path):
         image = cv2.imread(file_path)
         if image is None:
             exit("Could not read the image")
