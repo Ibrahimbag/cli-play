@@ -1,8 +1,9 @@
 from blessed import Terminal
-import cv2
 from sys import argv, exit
 from time import sleep
 from ffpyplayer.player import MediaPlayer
+from ffpyplayer.pic import SWScale, ImageLoader
+import numpy as np
 from pymediainfo import MediaInfo
 
 
@@ -24,66 +25,90 @@ class cli_play:
                     self.__show_picture(file_path)
 
     def __play_video(self, file_path):
-        cap = cv2.VideoCapture(file_path)
         player = MediaPlayer(file_path)
-
-        if not cap.isOpened():
-            exit("Error: Could not open video.")
+        sws = None
+        prev_height, prev_width = 0, 0
 
         while self.term.inkey(timeout=0) != "q":
-            success, image = cap.read()
-            if not success:
-                break
-
             height, width = self.term.height, self.term.width
-            image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+
+            frame, val = player.get_frame()
+
+            if val == 'eof':
+                break
+            if frame is None:
+                sleep(0.01)
+                continue
+
+            img, _ = frame
+
+            if sws is None or width != prev_width or height != prev_height:
+                x, y = img.get_size()
+                sws = SWScale(x, y, img.get_pixel_format(), ow=width, oh=height)
+                prev_width, prev_height = width, height
+
+            scaled_image = sws.scale(img)
+
+            image_buffer = scaled_image.to_bytearray()[0]
+
+            pixel_array = np.frombuffer(image_buffer, dtype=np.uint8)
+
+            rgb_image = pixel_array.reshape((height, width, 3))
 
             output = []
             for y in range(height):
                 for x in range(width):
-                    b, g, r = image[y, x]
+                    r, g, b = rgb_image[y, x]
                     output.append(
                         self.term.move(y, x) + self.term.on_color_rgb(r, g, b) + " "
                     )
 
             print("".join(output))
 
-            fps = 1 / cap.get(cv2.CAP_PROP_FPS)
-            audio_frame, val = player.get_frame()
-            if val != "eof" and audio_frame is not None:
-                _, pts = audio_frame
-                delay = fps - (player.get_pts() - pts)
-                sleep(max(0, delay))
-            else:
-                sleep(fps)
+            sleep(val)
 
-        cap.release()
+        player.close_player()
+
 
     def __show_picture(self, file_path):
-        image = cv2.imread(file_path)
-        if image is None:
-            exit("Could not read the image")
+        loader = ImageLoader(file_path)
+        frame = loader.next_frame()[0]
 
-        old_height, old_width = 0, 0
+        src_w, src_h = frame.get_size()
+        pix_fmt = frame.get_pixel_format()
+        ofmt = 'rgb24'
+
+        prev_height, prev_width = 0, 0
+
+        sws = None
+        rgb_image = None
+
+        output = []
+
         while self.term.inkey(timeout=0) != "q":
             height, width = self.term.height, self.term.width
-            if height != old_height or width != old_width:
-                image = cv2.imread(file_path)
-                image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
 
-            output = []
-            for y in range(height):
-                for x in range(width):
-                    b, g, r = image[y, x]
-                    output.append(
-                        self.term.move(y, x) + self.term.on_color_rgb(r, g, b) + " "
-                    )
+            if sws == None or height != prev_height or width != prev_width:
+                sws = SWScale(src_w, src_h, pix_fmt, ofmt=ofmt, ow=width, oh=height)
+                scaled_frame = sws.scale(frame)
 
-            if height != old_height or width != old_width:
+                frame_buffer = scaled_frame.to_bytearray()[0]
+
+                pixel_array = np.frombuffer(frame_buffer, dtype=np.uint8)
+                rgb_image = pixel_array.reshape((height, width, 3))
+
+                prev_height, prev_width = height, width
+
+                for y in range(height):
+                    for x in range(width):
+                        r, g, b = rgb_image[y, x]
+                        output.append(
+                            self.term.move(y, x) + self.term.on_color_rgb(r, g, b) + " "
+                        )
+
                 print("".join(output))
-                old_height, old_width = height, width
 
-            sleep(1)
+            sleep(0.5)
 
 
 def main():
