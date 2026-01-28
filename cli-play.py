@@ -34,7 +34,7 @@ class cli_play:
 
             frame, val = player.get_frame()
 
-            if val == 'eof':
+            if val == "eof":
                 break
             if frame is None:
                 sleep(0.01)
@@ -69,14 +69,13 @@ class cli_play:
 
         player.close_player()
 
-
     def __show_picture(self, file_path):
         loader = ImageLoader(file_path)
         frame = loader.next_frame()[0]
 
         src_w, src_h = frame.get_size()
         pix_fmt = frame.get_pixel_format()
-        ofmt = 'rgb24'
+        ofmt = "rgb24"
 
         prev_height, prev_width = 0, 0
 
